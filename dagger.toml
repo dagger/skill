@@ -7,3 +7,6 @@
 
 [modules.dagger-skills]
 source = "dagger"
+
+[modules.skills-tests]
+source = "tests"
