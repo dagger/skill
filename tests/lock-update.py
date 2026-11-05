@@ -27,6 +27,12 @@ with tempfile.TemporaryDirectory(prefix="dagger-skills-") as temp:
         '[modules.skills-tests]\nsource = "tests"\n'
     )
     (work / ".agents/skills").mkdir(parents=True)
+    unreleased = subprocess.run(
+        ["dagger", "--silent", "api", "call", "skills-tests", "unreleased", "is-empty"],
+        cwd=work, capture_output=True, text=True,
+    )
+    assert unreleased.returncode != 0, "Installed unreleased content"
+    assert "No stable skill release is available" in unreleased.stderr
     hostname = run(work, "api", "call", "skills-tests", "server", "hostname")
     old_commit = run(work, "api", "call", "skills-tests", "repository", "tag", "--name=v1.0.0", "commit")
     old_ref = "refs/tags/v1.0.0"

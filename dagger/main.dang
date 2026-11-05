@@ -12,6 +12,14 @@ type DaggerSkills {
 
   let repository: GitRepository!
 
+  let releasedContent: Directory! {
+    let release = repository.latest
+    if (release.ref.hasPrefix("refs/tags/") == false) {
+      raise "No stable skill release is available. Publish a stable version tag before generating."
+    }
+    release.tree.directory("dagger/content")
+  }
+
   """
   Existing skill directories at the workspace root. Symbolic links are skipped.
   """
@@ -50,7 +58,7 @@ type DaggerSkills {
       }
       output
         .withoutDirectory(destination)
-        .withDirectory(destination, repository.latest.tree.directory("dagger/content"))
+        .withDirectory(destination, releasedContent)
         .withNewFile(marker, "dagger.io/skills/dagger\n")
     }
     after.changes(before)
