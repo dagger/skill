@@ -19,17 +19,20 @@ https://docs.dagger.io/reference/sdks.
 
 1. Run `dagger module init dang -y`. This creates `.dagger/modules/PROJECT-dev`
    and makes it the workspace main module, so commands accept its functions
-   without the module name. Keep the type name that `init` writes.
+   without the module name. Keep the type name that `init` writes, or the load
+   fails with `no main object`.
 2. Write functions only for what the official modules cannot know: a container
    with the project tools, a `Service`, a check for a project step, or a deploy
-   function. Do not copy the logic of an official module.
+   function. Do not copy the logic of an official module. Test a container with
+   `dagger shell FUNCTION -c 'TOOL --version'`.
 3. Wire the container or service into a setting of the official module, such as
    `dagger module settings go base test-runtime`. Read the module page for the
    setting names. A `base` image sets the tool version, so unset the `version`
    setting with `-u`. Use an image version that agrees with native
    configuration.
 4. For a test service, bind it in the container with `withServiceBinding`. Give
-   its address in an environment variable that the tests read.
+   its address in an environment variable that the tests read. Run the check
+   again. The skipped tests must now run.
 
 ## Toolchain module
 
@@ -69,5 +72,7 @@ Read the Collections example on the Dang page. For design patterns, read
 
 ## After each change
 
-Run `dagger check -l` to load the module and show errors. Then do "Verify a
-change" in SKILL.md.
+Run `dagger check -l` to find load errors. It exits 0 when a load fails, so
+look for a row that shows `ERROR`. It does not find errors in a function body,
+such as a wrong field name. To find them, run a check that calls the function.
+Then do "Verify a change" in SKILL.md.

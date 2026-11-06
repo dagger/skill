@@ -79,14 +79,16 @@ job only after its checks give the same results.
 - Ask the user before a `dagger cloud` command that changes Cloud configuration.
   If a step needs a browser, such as login, tell the user to do it.
 - Do not use `dagger agent`, `-i`, or `dagger shell` without `-c`. They need an
-  interactive terminal.
+  interactive terminal. `dagger shell FUNCTION -c 'COMMAND'` runs COMMAND in the
+  container that FUNCTION returns.
 - Run `dagger check` with a long timeout. Run `dagger start` in the background,
   because it does not exit. Give `dagger start` a service name or a collection
   flag.
 - If a setting value starts with `-`, put `--` before it, such as
   `dagger module settings go goflags -- -tags=extended`.
 - If the engine does not start on the local machine, report the error. Do not
-  change `DAGGER_ENGINE` unless the user asks.
+  change `DAGGER_ENGINE` unless the user asks. If the error says that a capacity
+  limit is reached, wait, then run the command again.
 - Pass secrets as URIs, such as `env://TOKEN`. Do not put secret values in files
   or commands. Put other values in native configuration or settings, not in host
   environment variables.
@@ -113,7 +115,8 @@ for a missing service.
 - Check link ends with `/stale`: run `dagger generate -y LINK`, where LINK is
   the check link without `/stale`. Do not edit generated files.
 - File not found: the check sees only the files that its module includes, not
-  the whole workspace. Read the module page to include more files.
+  the whole workspace. To include the file, read the toolchain guide and the
+  module page.
 - Other check failure: find a fix function with `dagger api functions MODULE`,
   or read the module page under https://docs.dagger.io/reference/modules.
 - Run the failed check again by its DAG link.
