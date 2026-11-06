@@ -1,7 +1,7 @@
 """
 Tests for the Dagger skill generator.
 """
-type SkillsTests {
+type SkillTests {
   let assert(condition: Boolean!, message: String!): Void {
     if (condition == false) { raise message }
     null
@@ -13,7 +13,7 @@ type SkillsTests {
       .withEnvVariable("GIT_AUTHOR_DATE", "2026-01-01T00:00:00Z")
       .withEnvVariable("GIT_COMMITTER_DATE", "2026-01-01T00:00:00Z")
       .withWorkdir("/repo")
-      .withNewFile("dagger/content/SKILL.md", "released skill\n")
+      .withNewFile("content/SKILL.md", "released skill\n")
       .withExec(["git", "init"])
       .withExec(["git", "config", "--global", "--add", "safe.directory", "*"])
       .withExec(["git", "config", "user.name", "Test"])
@@ -21,20 +21,20 @@ type SkillsTests {
       .withExec(["git", "add", "."])
       .withExec(["git", "commit", "-m", "release"])
       .withExec(["git", "tag", "v1.0.0"])
-      .withNewFile("dagger/content/SKILL.md", "released skill two\n")
+      .withNewFile("content/SKILL.md", "released skill two\n")
       .withExec(["git", "add", "."])
       .withExec(["git", "commit", "-m", "release two"])
       .withExec(["git", "tag", "v2.0.0"])
   }
 
   pub server: Service! {
-    source.withExec(["git", "clone", "--bare", ".", "/srv/skills.git"])
+    source.withExec(["git", "clone", "--bare", ".", "/srv/skill.git"])
       .withExposedPort(9418)
       .asService(args: ["git", "daemon", "--verbose", "--reuseaddr", "--export-all", "--base-path=/srv", "--listen=0.0.0.0"])
   }
 
   pub repository: GitRepository! {
-    git("git://" + server.hostname + "/skills.git", experimentalServiceHost: server)
+    git("git://" + server.hostname + "/skill.git", experimentalServiceHost: server)
   }
 
   let localRepository: GitRepository! {
@@ -44,7 +44,7 @@ type SkillsTests {
   pub unreleased: Changeset! {
     let repo = source.withExec(["git", "tag", "-d", "v1.0.0", "v2.0.0"])
       .directory("/repo").asGit
-    skills(repository: repo).generate(directory.withNewDirectory(".agents/skills").asWorkspace)
+    skill(repository: repo).generate(directory.withNewDirectory(".agents/skills").asWorkspace)
   }
 
   pub generation: Void @check {
@@ -53,15 +53,15 @@ type SkillsTests {
       .withNewDirectory(".claude/skills")
       .withNewFile(".agents/skills/other/SKILL.md", "keep\n")
       .withNewFile("source.txt", "keep\n")
-    let changes = skills(repository: localRepository).generate(before.asWorkspace)
+    let changes = skill(repository: localRepository).generate(before.asWorkspace)
     let after = changes.after
     assert(after.file(".agents/skills/dagger/SKILL.md").contents == "released skill two\n", "Missing released skill")
     assert(after.file(".claude/skills/dagger/SKILL.md").contents == "released skill two\n", "Missing second skill")
     assert(after.file(".agents/skills/other/SKILL.md").contents == "keep\n", "Changed unrelated skill")
     assert(after.file("source.txt").contents == "keep\n", "Changed project source")
-    assert(skills(repository: localRepository).generate(after.asWorkspace).isEmpty, "Repeated generation changed files")
+    assert(skill(repository: localRepository).generate(after.asWorkspace).isEmpty, "Repeated generation changed files")
     let stale = after.withNewFile(".agents/skills/dagger/obsolete.txt", "old\n")
-    assert(skills(repository: localRepository).generate(stale.asWorkspace).after.exists(".agents/skills/dagger/obsolete.txt") == false, "Obsolete managed file was kept")
+    assert(skill(repository: localRepository).generate(stale.asWorkspace).after.exists(".agents/skills/dagger/obsolete.txt") == false, "Obsolete managed file was kept")
   }
 
   pub discovery: Void @check {
@@ -71,7 +71,7 @@ type SkillsTests {
       .withSymlink("other", ".agents")
       .withNewDirectory(".claude")
       .withSymlink("../other/skills", ".claude/skills")
-    assert(skills.targets(source.asWorkspace).length == 0, "Followed a symlink or nested path")
-    assert(skills.generate(source.asWorkspace).isEmpty, "Empty discovery changed files")
+    assert(skill.targets(source.asWorkspace).length == 0, "Followed a symlink or nested path")
+    assert(skill.generate(source.asWorkspace).isEmpty, "Empty discovery changed files")
   }
 }

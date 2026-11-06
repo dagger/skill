@@ -5,8 +5,8 @@
 
 [modules]
 
-[modules.dagger-skills]
-source = "dagger"
+[modules.dagger-skill]
+source = "."
 
-[modules.skills-tests]
+[modules.skill-tests]
 source = "tests"

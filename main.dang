@@ -1,12 +1,12 @@
 """
 Install and update the official Dagger agent skill in existing skill directories.
 """
-type DaggerSkills {
+type DaggerSkill {
   """
   Git repository containing released skills.
   """
   new(repository: GitRepository = null) {
-    self.repository = repository ?? git("https://github.com/dagger/skills")
+    self.repository = repository ?? git("https://github.com/dagger/skill")
     self
   }
 
@@ -17,7 +17,7 @@ type DaggerSkills {
     if (release.ref.hasPrefix("refs/tags/") == false) {
       raise "No stable skill release is available. Publish a stable version tag before generating."
     }
-    release.tree.directory("dagger/content")
+    release.tree.directory("content")
   }
 
   """
@@ -52,14 +52,14 @@ type DaggerSkills {
         if (before.exists(marker, expectedType: ExistsType.REGULAR_TYPE, doNotFollowSymlinks: true) == false) {
           raise "Existing skill at " + destination + " is not managed by this module. Move it before generating."
         }
-        if (before.file(marker).contents != "dagger.io/skills/dagger\n") {
+        if (before.file(marker).contents != "dagger.io/skill\n") {
           raise "Unknown skill owner at " + destination + ". Move it before generating."
         }
       }
       output
         .withoutDirectory(destination)
         .withDirectory(destination, releasedContent)
-        .withNewFile(marker, "dagger.io/skills/dagger\n")
+        .withNewFile(marker, "dagger.io/skill\n")
     }
     after.changes(before)
   }

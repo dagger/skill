@@ -16,27 +16,28 @@ def run(work, *args):
     ).strip()
 
 
-with tempfile.TemporaryDirectory(prefix="dagger-skills-") as temp:
+with tempfile.TemporaryDirectory(prefix="dagger-skill-") as temp:
     work = Path(temp)
     subprocess.run(["git", "init", "-q", temp], check=True)
-    shutil.copytree(ROOT / "dagger", work / "dagger")
+    for name in ("dagger-module.toml", "main.dang"):
+        shutil.copy(ROOT / name, work / name)
     shutil.copytree(ROOT / "tests", work / "tests")
     (work / "dagger.toml").write_text(
-        '[modules.dagger-skills]\nsource = "dagger"\n'
-        '[modules.dagger-skills.settings]\nrepository = "dag://skills-tests/repository"\n'
-        '[modules.skills-tests]\nsource = "tests"\n'
+        '[modules.dagger-skill]\nsource = "."\n'
+        '[modules.dagger-skill.settings]\nrepository = "dag://skill-tests/repository"\n'
+        '[modules.skill-tests]\nsource = "tests"\n'
     )
     (work / ".agents/skills").mkdir(parents=True)
     unreleased = subprocess.run(
-        ["dagger", "--silent", "api", "call", "skills-tests", "unreleased", "is-empty"],
+        ["dagger", "--silent", "api", "call", "skill-tests", "unreleased", "is-empty"],
         cwd=work, capture_output=True, text=True,
     )
     assert unreleased.returncode != 0, "Installed unreleased content"
     assert "No stable skill release is available" in unreleased.stderr
-    hostname = run(work, "api", "call", "skills-tests", "server", "hostname")
-    old_commit = run(work, "api", "call", "skills-tests", "repository", "tag", "--name=v1.0.0", "commit")
+    hostname = run(work, "api", "call", "skill-tests", "server", "hostname")
+    old_commit = run(work, "api", "call", "skill-tests", "repository", "tag", "--name=v1.0.0", "commit")
     old_ref = "refs/tags/v1.0.0"
-    identity = hostname + "/skills"
+    identity = hostname + "/skill"
     entries = [
         [["version", "2"]],
         ["", "git-latest", [identity], old_ref],
@@ -81,7 +82,7 @@ with tempfile.TemporaryDirectory(prefix="dagger-skills-") as temp:
     run(public, "lock", "update")
     refreshed = json.loads(run(public, "query", "--doc", str(query)))
     assert refreshed["git"]["latest"]["ref"] != "refs/tags/v0.1.0", "Lock update kept the old release"
-    new_commit = run(work, "api", "call", "skills-tests", "repository", "tag", "--name=v2.0.0", "commit")
+    new_commit = run(work, "api", "call", "skill-tests", "repository", "tag", "--name=v2.0.0", "commit")
     entries[1][3] = "refs/tags/v2.0.0"
     entries[2] = ["", "git-sha", [identity, "refs/tags/v2.0.0"], new_commit]
     lock.write_text("\n".join(json.dumps(row) for row in entries) + "\n")
