@@ -87,8 +87,7 @@ job only after its checks give the same results.
 - If a setting value starts with `-`, put `--` before it, such as
   `dagger module settings go goflags -- -tags=extended`.
 - If the engine does not start on the local machine, report the error. Do not
-  change `DAGGER_ENGINE` unless the user asks. If the error says that a capacity
-  limit is reached, wait, then run the command again.
+  change `DAGGER_ENGINE` unless the user asks.
 - Pass secrets as URIs, such as `env://TOKEN`. Do not put secret values in files
   or commands. Put other values in native configuration or settings, not in host
   environment variables.
