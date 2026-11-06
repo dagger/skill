@@ -1,66 +1,122 @@
 ---
 name: dagger
-description: Set up and use Dagger workspace checks, generators, and modules. Use for Dagger CLI tasks, dagger.toml changes, and validation through installed Dagger modules.
+description: Run, set up, and write Dagger 1.0 checks, generators, services, and modules. Use when the repository has dagger.toml, dagger.json, or dagger-module.toml, or when the user mentions Dagger, dag:// links, or Dagger Cloud.
 ---
 
-# Work with Dagger
+# Dagger
 
-Use command-specific `--help` and printed next steps from the installed CLI.
-Commands and flags can depend on installed modules. Read existing
-`dagger.toml` and keep related `dagger.lock` changes. Work from the intended
-project, or select it with `dagger -W PATH`.
+Dagger is CI. It runs the same checks before push (`dagger check`) and after
+push (Cloud Checks). Checks run as functions in containers. Modules run native
+tools, such as `go test` or ESLint, and read their native configuration, such as
+`go.mod`.
 
-## Set up only what is missing
+## When to use it
 
-Reuse an existing workspace and its modules. For a new workspace, run
-`dagger init` and follow its setup guidance. A config file alone does not mean
-checks are installed. Non-interactive `dagger module recommend` without `-y`
-prints install commands but installs nothing. Select modules for the project's
-tools. Use `dagger module search QUERY` if recommendations miss a tool.
+- `dagger.toml` exists: use `dagger` instead of native tools to build, test,
+  lint, and generate.
+- Only `dagger.json` exists: it is Dagger 0.x configuration. Dagger 1.0 runs it.
+  Migrate only when the user asks.
+- Only `dagger-module.toml` exists: the repository is a module. Read
+  [write-a-module.md](write-a-module.md).
+- No file exists: set up Dagger only when the user asks.
 
-A known module can be installed directly with `dagger module install SOURCE`;
-this also creates missing workspace configuration. Prefer existing modules
-for standard tools. Use `dagger module settings` to discover settings.
+## Read first
 
-If the CLI directs you to migrate, use that migration command and its help.
-Do not replace legacy configuration with an empty file. Installing checks
-does not require creating a module or adding an SDK.
+Dagger 1.0 is different from 0.x. Do not trust your memory.
 
-## Discover, then run
+- Before each task in "Tasks", read its docs page. Do not skip this for setup.
+- To find other pages, read https://docs.dagger.io/llms.txt. Do not use web
+  search results or blog posts.
+- For toolchain guides, such as Go or ESLint, and CI migration guides, read the
+  "Guides" list of https://dagger.io/llms.txt. Add `.md` to a guide URL to get
+  Markdown.
+- For commands and flags, read `dagger COMMAND --help`. If the docs and the CLI
+  disagree, follow the CLI.
 
-Use `dagger generate -l` and `dagger check -l` to discover available work.
-During setup, apply needed generated files before checking the project.
-For later edits, select work relevant to the change.
+## Terms
 
-A `*` in a list is a collection summary. Add `--all` to see actual items;
-a summary can represent an empty collection. Setup is complete only when
-at least one relevant check runs and all workspace checks pass.
+- **Workspace**: a directory with `dagger.toml`, usually a Git repository.
+  `dagger.toml` lists the installed modules and their settings.
+- **Module**: a package of functions. Its manifest is `dagger-module.toml`.
+- **Setting**: a value for a module constructor argument.
+- **Check**: a function that passes or fails, such as a test or a linter.
+- **Generator**: a function that returns a changeset (proposed file changes).
+- **Collection**: a set of artifacts (typed objects, such as Go packages or test
+  files) that a module finds at run time. Each collection adds a flag to select
+  artifacts.
+- **DAG link**: the `dag://` address of a check, generator, service, or
+  artifact. To list links, add `-l -a -f link` to `dagger check`, `generate`, or
+  `start`. For the syntax, read `dagger help links`.
 
-Run `dagger check` for all workspace checks. To find a focused selection, use
-`dagger check -l --all --format=cli`, then add `dagger check` before a listed
-row's flags. Use returned links and help rather than inventing filter names.
+## Tasks
 
-## Apply fixes deliberately
+| Task | Start with | Docs (docs.dagger.io) |
+| --- | --- | --- |
+| Set up a workspace | `dagger init` | /getting-started/quickstart |
+| Add a module for a tool | `dagger module recommend`, `dagger module search TOOL` | /reference/modules |
+| Give project tools or services to a module | Read [write-a-module.md](write-a-module.md) | /config/module-wiring |
+| Change module settings | `dagger module settings` | /config |
+| Run checks | `dagger check -l` | /using/checking |
+| Run generators | `dagger generate -l` | /using/generating |
+| Start services | `dagger start -l` | /using/services |
+| Call a function | `dagger api functions` | /using/calling-functions |
+| Run checks after each push to GitHub | `dagger cloud checks on` | /cloud-checks |
+| Move from another CI | Read the guide for that CI | /cloud-checks |
+| Write a module | Read [write-a-module.md](write-a-module.md) | /reference/sdks |
+| Migrate from 0.x | `dagger workspace migrate` | /migrate-to-v1 |
 
-A changeset contains proposed file changes. Choose `dagger generate -y` to
-apply changes required by the task, or `dagger generate --no-apply` for a
-preview. A preview run is not required before an authorized change.
+After setup, stop when at least one check runs. Tell the user which modules you
+installed and which commands run them.
 
-A successful preview does not mean generated files are current. Use
-`dagger check --generated=true` to test that without applying changes.
-Regenerate stale files rather than editing generated output by hand.
+Cloud Checks run checks only. Put each deploy or release step in a function of
+the dev module, not in a check. The existing CI or the user calls it with
+`dagger api call`. When you move from another CI, keep the old jobs. Remove a
+job only after its checks give the same results.
 
-Not every fix is a generator. Formatters can return changesets through
-`dagger api call`. Use `--help` along the function path to find arguments.
-Use `-y` to apply changes required by the task. Inspect the diff and rerun
-the check.
+## Command rules
 
-## Cloud Checks when requested
+- To apply a changeset, add `-y`. To preview it, add `--no-apply`.
+- Ask the user before a `dagger cloud` command that changes Cloud configuration.
+  If a step needs a browser, such as login, tell the user to do it.
+- Do not use `dagger agent`, `-i`, or `dagger shell` without `-c`. They need an
+  interactive terminal.
+- Run `dagger check` with a long timeout. Run `dagger start` in the background,
+  because it does not exit. Give `dagger start` a service name or a collection
+  flag.
+- If a setting value starts with `-`, put `--` before it, such as
+  `dagger module settings go goflags -- -tags=extended`.
+- If the engine does not start on the local machine, report the error. Do not
+  change `DAGGER_ENGINE` unless the user asks.
+- Pass secrets as URIs, such as `env://TOKEN`. Do not put secret values in files
+  or commands. Put other values in native configuration or settings, not in host
+  environment variables.
+- Do not add logic that skips checks for unchanged files. The cache skips repeat
+  work.
+- Commit `dagger.toml`, `dagger.lock`, and the module directories, such as
+  `.dagger`.
 
-Use `dagger cloud checks on` and follow its prerequisite and retry commands.
-Browser steps can require user action; do not loop on unmet prerequisites.
-Check that the Git remote identifies the intended repository. After pushing
-configuration and generated files, verify the run with
-`dagger workspace activity`. Cloud setup is not required for local checks.
+## Verify a change
 
-For setup context, read https://docs.dagger.io/getting-started/.
+1. Before the change, run `dagger check`. Report failures. Fix them only when
+   the user asks.
+2. After the change, run the affected checks. Select them with a DAG link or a
+   collection flag, such as `--go-package=PATH`.
+3. Run `dagger check` again. Fix new failures until no new check fails.
+
+A skipped test does not fail its check. If the report shows skipped tests, look
+for a missing service.
+
+## Fix a failure
+
+- If you are logged in to Dagger Cloud, read the failure with
+  `dagger cloud traces view --last` or `dagger cloud traces view URL`.
+- Check link ends with `/stale`: run `dagger generate -y LINK`, where LINK is
+  the check link without `/stale`. Do not edit generated files.
+- File not found: the check sees only the files that its module includes, not
+  the whole workspace. Read the module page to include more files.
+- Other check failure: find a fix function with `dagger api functions MODULE`,
+  or read the module page under https://docs.dagger.io/reference/modules.
+- Run the failed check again by its DAG link.
+- Command fails without a clear cause: compare `dagger version` with
+  https://docs.dagger.io/getting-started/install. Tell the user if the CLI is
+  older. Suggest `dagger lock update` if `dagger.lock` pins old versions.
