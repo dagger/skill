@@ -2,16 +2,27 @@
 
 The official agent skill for Dagger.
 
-Install the module in a project with an existing skill directory:
+Install the module. If the project has no `dagger.toml`, the install creates
+one:
 
 ```sh
 dagger module install dagger.io/skill
 dagger generate
 ```
 
-The module detects `.agents/skills`, `.claude/skills`, `.cursor/skills`,
-`.gemini/skills`, `.github/skills`, and `.opencode/skills` at the workspace root.
-It skips symbolic links. It does not create agent settings directories.
+The module installs the skill into each of `.agents/skills`, `.claude/skills`,
+`.cursor/skills`, `.gemini/skills`, `.github/skills`, and `.opencode/skills`
+that exists at the workspace root. If none exists, it uses the agent
+instructions at the root: `AGENTS.md` creates `.agents/skills`, and `CLAUDE.md`
+creates `.claude/skills`. With both files, it creates both directories. It skips
+symbolic links to agent directories. If it finds no skill directory and no
+instructions, generation fails with an error.
+
+Agents find this module through `dagger module recommend` and
+`dagger generate -l`, not this README. The module and generator descriptions
+tell an agent to create its own skills directory before generating, and to read
+the installed `SKILL.md` afterwards, because an agent may not load a skills
+directory created during its session.
 
 Generation returns a changeset for review. An ownership marker identifies
 installed skills. Existing skills without that marker cause an error.

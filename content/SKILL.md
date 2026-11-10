@@ -12,24 +12,26 @@ tools, such as `go test` or ESLint, and read their native configuration, such as
 
 ## When to use it
 
-- `dagger.toml` exists: use `dagger` instead of native tools to build, test,
-  lint, and generate.
+- `dagger.toml` exists: prefer `dagger` to native tools to build, test, lint,
+  and generate. A native command, such as `go test ./pkg`, is fine for a quick
+  loop, but verify each change with `dagger check`.
 - Only `dagger.json` exists: it is Dagger 0.x configuration. Dagger 1.0 runs it.
   Migrate only when the user asks.
-- Only `dagger-module.toml` exists: the repository is a module. Read
-  [write-a-module.md](write-a-module.md).
+- `dagger-module.toml` exists, with or without `dagger.toml`: the repository is
+  a module. Read [write-a-module.md](write-a-module.md).
 - No file exists: set up Dagger only when the user asks.
 
 ## Read first
 
 Dagger 1.0 is different from 0.x. Do not trust your memory.
 
-- Before each task in "Tasks", read its docs page. Do not skip this for setup.
+- The first time you do a task in "Tasks", read its docs page. Read each page
+  once per session. Do not skip this for setup.
 - To find other pages, read https://docs.dagger.io/llms.txt. Do not use web
   search results or blog posts.
 - For toolchain guides, such as Go or ESLint, and CI migration guides, read the
   "Guides" list of https://dagger.io/llms.txt. Add `.md` to a guide URL to get
-  Markdown.
+  Markdown. Pages on docs.dagger.io have no `.md` form.
 - For commands and flags, read `dagger COMMAND --help`. If the docs and the CLI
   disagree, follow the CLI.
 
@@ -46,7 +48,8 @@ Dagger 1.0 is different from 0.x. Do not trust your memory.
   artifacts.
 - **DAG link**: the `dag://` address of a check, generator, service, or
   artifact. To list links, add `-l -a -f link` to `dagger check`, `generate`, or
-  `start`. For the syntax, read `dagger help links`.
+  `start`. For the syntax, read `dagger help links`. A `dag+check://` or
+  `dag+generator://` link is the same address as its `dag://` form.
 
 ## Tasks
 
@@ -65,13 +68,33 @@ Dagger 1.0 is different from 0.x. Do not trust your memory.
 | Write a module | Read [write-a-module.md](write-a-module.md) | /reference/sdks |
 | Migrate from 0.x | `dagger workspace migrate` | /migrate-to-v1 |
 
-After setup, stop when at least one check runs. Tell the user which modules you
-installed and which commands run them.
+## Finish setup
 
-Cloud Checks run checks only. Put each deploy or release step in a function of
-the dev module, not in a check. The existing CI or the user calls it with
-`dagger api call`. When you move from another CI, keep the old jobs. Remove a
-job only after its checks give the same results.
+Setup is done when at least one check of the project's real code passes.
+
+1. Run `dagger check -l`. Each toolchain module, such as `dagger.io/go`, must
+   list checks for the project's code. If a module lists no checks or misses code, first look for
+   missing native configuration, such as no `go.mod` at the expected path.
+   Then read the module page for its settings.
+2. Run `dagger check`. Report each failure and each skipped test.
+3. Find agent and contributor instructions that name native commands, such as
+   `./check.sh` or `go test` in `AGENTS.md`, `CLAUDE.md`, or `CONTRIBUTING.md`.
+   Tell the user, and offer to replace them with the matching `dagger`
+   commands.
+4. Tell the user which modules you installed and which commands run them.
+
+## Move from another CI
+
+Moving CI is a separate task from setup. It is done when Dagger checks cover
+what each old job tests.
+
+- Keep the old jobs. Remove a job only after Dagger checks cover what it tests
+  and give the same results.
+- Checks run in Linux containers. Keep jobs that need another platform, such as
+  Windows or macOS runners. Tell the user which jobs stay.
+- Cloud Checks run checks only. Put each deploy or release step in a function
+  of the dev module, not in a check. The existing CI or the user calls it with
+  `dagger api call`.
 
 ## Command rules
 
@@ -81,16 +104,17 @@ job only after its checks give the same results.
 - Do not use `dagger agent`, `-i`, or `dagger shell` without `-c`. They need an
   interactive terminal. `dagger shell FUNCTION -c 'COMMAND'` runs COMMAND in the
   container that FUNCTION returns.
-- Run `dagger check` with a long timeout. Run `dagger start` in the background,
-  because it does not exit. Give `dagger start` a service name or a collection
-  flag.
+- Run `dagger check` and `dagger start` in the background. A full check can
+  run longer than a command timeout, and `dagger start` does not exit. Give
+  `dagger start` a service name or a collection flag.
 - If a setting value starts with `-`, put `--` before it, such as
   `dagger module settings go goflags -- -tags=extended`.
 - If the engine does not start on the local machine, report the error. Do not
   change `DAGGER_ENGINE` unless the user asks.
 - Pass secrets as URIs, such as `env://TOKEN`. Do not put secret values in files
   or commands. Put other values in native configuration or settings, not in host
-  environment variables.
+  environment variables. Host environment variables do not reach checks. To
+  give a test an environment variable, set it in the container.
 - Do not add logic that skips checks for unchanged files. The cache skips repeat
   work.
 - Commit `dagger.toml`, `dagger.lock`, and the module directories, such as
@@ -98,26 +122,30 @@ job only after its checks give the same results.
 
 ## Verify a change
 
-1. Before the change, run `dagger check`. Report failures. Fix them only when
-   the user asks.
+1. At the start of the task, run `dagger check` once. Report failures. Fix
+   them only when the user asks.
 2. After the change, run the affected checks. Select them with a DAG link or a
    collection flag, such as `--go-package=PATH`.
 3. Run `dagger check` again. Fix new failures until no new check fails.
 
-A skipped test does not fail its check. If the report shows skipped tests, look
-for a missing service.
+A skipped test does not fail its check. If the report shows skipped tests, find
+the cause: a missing executable, build tag, environment setting, or service, or
+a test that needs another platform. Fix it with a module setting or a dev
+module. Read [write-a-module.md](write-a-module.md).
 
 ## Fix a failure
 
 - If you are logged in to Dagger Cloud, read the failure with
   `dagger cloud traces view --last` or `dagger cloud traces view URL`.
-- Check link ends with `/stale`: run `dagger generate -y LINK`, where LINK is
-  the check link without `/stale`. Do not edit generated files.
+- Check link ends with `/stale`, such as `dag://?check=MODULE/NAME/stale`: run
+  `dagger generate -y 'dag://?generator=MODULE/NAME'`. Do not edit generated
+  files.
 - File not found: the check sees only the files that its module includes, not
   the whole workspace. To include the file, read the toolchain guide and the
   module page.
-- Other check failure: find a fix function with `dagger api functions MODULE`,
-  or read the module page under https://docs.dagger.io/reference/modules.
+- Other check failure: look for a function that fixes it, such as a formatter
+  or a generator, with `dagger api functions MODULE`. Or read the module page
+  under https://docs.dagger.io/reference/modules.
 - Run the failed check again by its DAG link.
 - Command fails without a clear cause: compare `dagger version` with
   https://docs.dagger.io/getting-started/install. Tell the user if the CLI is

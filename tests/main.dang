@@ -64,14 +64,62 @@ type SkillTests {
     assert(skill(repository: localRepository).generate(stale.asWorkspace).after.exists(".agents/skills/dagger/obsolete.txt") == false, "Obsolete managed file was kept")
   }
 
+  let installed(source: Directory!): Directory! {
+    skill(repository: localRepository).generate(source.asWorkspace).after
+  }
+
+  let failure(source: Directory!): String {
+    { skill(repository: localRepository).generate(source.asWorkspace).isEmpty; null } rescue {
+      err: Error => err.message
+    }
+  }
+
   pub discovery: Void @check {
     let source = directory
       .withNewDirectory("nested/.cursor/skills")
+      .withNewFile("nested/AGENTS.md", "nested\n")
       .withNewDirectory("other/skills")
       .withSymlink("other", ".agents")
       .withNewDirectory(".claude")
       .withSymlink("../other/skills", ".claude/skills")
     assert(skill.targets(source.asWorkspace).length == 0, "Followed a symlink or nested path")
-    assert(skill.generate(source.asWorkspace).isEmpty, "Empty discovery changed files")
+    let message = failure(source) ?? ""
+    assert(message.contains("No skill directory or agent instructions found"), "Missing error for no install target")
+    let instructed = source
+      .withNewFile("AGENTS.md", "agents\n")
+      .withNewFile("CLAUDE.md", "claude\n")
+    assert(skill.targets(instructed.asWorkspace).length == 0, "Created a skill directory through a symlink")
+  }
+
+  pub fallback: Void @check {
+    let agents = installed(directory.withNewFile("AGENTS.md", "agents\n"))
+    assert(agents.exists(".agents/skills/dagger/SKILL.md"), "AGENTS.md did not select .agents/skills")
+    assert(agents.exists(".claude") == false, "AGENTS.md created .claude")
+    assert(skill(repository: localRepository).generate(agents.asWorkspace).isEmpty, "Repeated fallback generation changed files")
+
+    let claude = installed(
+      directory
+        .withNewFile("CLAUDE.md", "claude\n")
+        .withNewFile(".claude/settings.json", "{}\n")
+    )
+    assert(claude.exists(".claude/skills/dagger/SKILL.md"), "CLAUDE.md did not select .claude/skills")
+    assert(claude.file(".claude/settings.json").contents == "{}\n", "Changed agent settings")
+    assert(claude.exists(".agents") == false, "CLAUDE.md created .agents")
+
+    let both = installed(
+      directory
+        .withNewFile("AGENTS.md", "agents\n")
+        .withSymlink("AGENTS.md", "CLAUDE.md")
+    )
+    assert(both.exists(".agents/skills/dagger/SKILL.md"), "Both files did not select .agents/skills")
+    assert(both.exists(".claude/skills/dagger/SKILL.md"), "A symlinked CLAUDE.md did not select .claude/skills")
+
+    let existing = installed(
+      directory
+        .withNewDirectory(".github/skills")
+        .withNewFile("AGENTS.md", "agents\n")
+    )
+    assert(existing.exists(".github/skills/dagger/SKILL.md"), "Missing skill in existing directory")
+    assert(existing.exists(".agents") == false, "AGENTS.md overrode an existing skill directory")
   }
 }
