@@ -1,5 +1,5 @@
 """
-Install and update the official Dagger agent skill in existing skill directories.
+Install the official Dagger agent skill. Agents: create your skills directory, such as .claude/skills, before dagger generate.
 """
 type DaggerSkill {
   """
@@ -21,11 +21,13 @@ type DaggerSkill {
   }
 
   """
-  Existing skill directories at the workspace root. Symbolic links are skipped.
+  Skill directories to install into. These are the existing skill directories
+  at the workspace root. With none, AGENTS.md selects .agents/skills and
+  CLAUDE.md selects .claude/skills. Symbolic links are skipped.
   """
   pub targets(ws: Workspace!): [String!]! {
     let source = ws.directory("/")
-    [".agents", ".claude", ".cursor", ".gemini", ".github", ".opencode"]
+    let existing = [".agents", ".claude", ".cursor", ".gemini", ".github", ".opencode"]
       .filter { agent =>
         source.exists(agent, expectedType: ExistsType.DIRECTORY_TYPE, doNotFollowSymlinks: true)
       }
@@ -33,14 +35,36 @@ type DaggerSkill {
       .filter { target =>
         source.exists(target, expectedType: ExistsType.DIRECTORY_TYPE, doNotFollowSymlinks: true)
       }
+    if (existing.length == 0) {
+      [".agents", ".claude"]
+        .filter { agent =>
+          let instructions = if (agent == ".agents") { "AGENTS.md" } else { "CLAUDE.md" }
+          let agentFree = source.exists(agent, doNotFollowSymlinks: true) == false
+          let agentDirectory = source.exists(agent, expectedType: ExistsType.DIRECTORY_TYPE, doNotFollowSymlinks: true)
+          source.exists(instructions, expectedType: ExistsType.REGULAR_TYPE) and
+            (agentFree or agentDirectory) and
+            source.exists(agent + "/skills", doNotFollowSymlinks: true) == false
+        }
+        .map { agent => agent + "/skills" }
+    } else {
+      existing
+    }
   }
 
   """
-  Install the latest released Dagger skill. dagger.lock pins the release until
-  dagger lock update. Review and apply the result with dagger generate.
+  Install the Dagger skill. Agents: first create your skills directory, such as .claude/skills, then read the installed dagger/SKILL.md.
+
+  Agents may not load a skills directory created during a session, so read
+  SKILL.md after generating. The skill goes into each existing skill directory
+  at the workspace root. With none, AGENTS.md selects .agents/skills and
+  CLAUDE.md selects .claude/skills. dagger.lock pins the latest release until
+  dagger lock update.
   """
   pub generate(ws: Workspace!): Changeset! @generate {
     let paths = targets(ws)
+    if (paths.length == 0) {
+      raise "No skill directory or agent instructions found. Create the skills directory your agent reads, such as .claude/skills or .agents/skills, then generate again."
+    }
     let before = ws.directory("/")
     let after = paths.reduce(before) { output, target =>
       let destination = target + "/dagger"

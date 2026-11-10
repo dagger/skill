@@ -26,7 +26,13 @@ https://docs.dagger.io/reference/sdks.
    `dagger shell FUNCTION -c 'TOOL --version'`.
 3. Wire the container or service into a setting of the official module, such as
    `dagger module settings go base test-runtime`. Read the module page for the
-   setting names. Use a tool version that agrees with native configuration.
+   setting names. The value `test-runtime` names a dev module function that
+   takes no arguments and returns the setting's type. The command writes it as
+   `dag://PROJECT-dev/test-runtime`. In `dagger.toml` and in CLI flags, write
+   the `dag://` form: a bare name there is an image reference or a path. Take
+   each tool version from native configuration. If only
+   the old CI pins a version, such as a GitHub Actions workflow, use that
+   version and tell the user that both places must change together.
 4. For a test service, bind it in the container with `withServiceBinding`. Give
    its address in an environment variable that the tests read. Run the check
    again. The skipped tests must now run.
@@ -53,6 +59,7 @@ Read the Collections example on the Dang page. For design patterns, read
    check to the collection.
 4. **Checks and generators.** Mark them, so that `dagger check` and
    `dagger generate` find them. A check takes no arguments from the caller.
+   Dagger fills the arguments it provides, such as `ws: Workspace!`.
 5. **Settings.** Put values about the module itself, such as a base image, in
    constructor arguments. Give each one a default, so that the checks run with
    no settings.
@@ -63,8 +70,9 @@ Read the Collections example on the Dang page. For design patterns, read
    the cache.
 7. **Services.** For a test dependency, such as a database, use a Dagger
    service. Do not use Docker in Docker.
-8. **Dependencies.** To call another module, run `dagger module client add`.
-   Do not use the global `dag` client.
+8. **Dependencies.** To call another module, add it with
+   `dagger module client add`, then call it by its dependency name. Do not
+   rely on a module that the workspace installs but the module does not add.
 9. **Tests.** Add fixtures that pass and fixtures that fail.
 
 ## After each change
